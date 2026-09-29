@@ -5,6 +5,8 @@ Supabase + Alembic project, this one goes further into a real-world concern:
 **authentication** — secure password storage, JWT access/refresh tokens, and
 refresh token rotation with reuse detection.
 
+🔗 **Live Demo:** [your-app-name.onrender.com](https://your-app-name.onrender.com/)
+
 ## Learning Goals
 
 - ✅ Feature-based, industry-standard project structure
@@ -173,3 +175,15 @@ all implemented and manually tested.
 - Service / repository layer separation
 - Centralized exception handling
 - Role-based authorization (admin vs. regular user)
+
+---
+
+## 👤 Author
+
+- **[Mohammad Zahid Kamal]** *Full Stack AI Enthusiast & Developer*
+- *LinkedIn* [https://www.linkedin.com/in/md-zahid-kamal/]
+- *Portfolio* [https://md-zahid-kamal.vercel.app/]
+
+---
+
+*Developed with ❤️ as part of an AI Exploration Project.*
