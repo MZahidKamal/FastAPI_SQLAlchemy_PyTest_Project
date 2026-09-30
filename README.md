@@ -5,7 +5,7 @@ Supabase + Alembic project, this one goes further into a real-world concern:
 **authentication** — secure password storage, JWT access/refresh tokens, and
 refresh token rotation with reuse detection.
 
-🔗 **Live Demo:** [your-app-name.onrender.com](https://your-app-name.onrender.com/)
+🔗 **Live Demo:** [fastapi-sqlalchemy-pytest-project.onrender.com](https://fastapi-sqlalchemy-pytest-project.onrender.com/)
 
 ## Learning Goals
 
