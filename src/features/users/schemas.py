@@ -69,3 +69,10 @@ class RefreshRequest(BaseModel):
 
 
 
+
+class SignoutRequest(BaseModel):
+    refresh_token: str
+
+
+
+

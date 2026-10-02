@@ -6,7 +6,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from datetime import datetime, timezone
 # Internal imports -----------------------------------------------------------------------------------------------------
-from src.features.users.schemas import UserCreate, UserResponse, UserLogin, LoginResponse, TokenResponse
+from src.features.users.schemas import UserCreate, UserResponse, UserLogin, LoginResponse, TokenResponse, SignoutRequest
 from src.features.users.models import User, RefreshToken
 from src.db.session import get_db
 from src.core.security import create_access_token, create_refresh_token, decode_token
@@ -205,9 +205,36 @@ async def refresh_tokens(request: RefreshRequest, db: Session = Depends(get_db))
 
 # Get A Single User API ------------------------------------------------------------------------------------------------
 
+# @router.get("/{user_id}", response_model=UserResponse, status_code=200)
+# async def get_user(user_id: int, db: Session = Depends(get_db)):
+#     try:
+#         existing_user = db.query(User).filter(User.id == user_id).first()
+#
+#         if existing_user is None:
+#             raise HTTPException(status_code=404, detail="User not found")
+#
+#     except HTTPException:
+#         raise
+#
+#     except SQLAlchemyError as error:
+#         raise HTTPException(status_code=500, detail="Database error occurred while fetching user") from error
+#
+#     except Exception as error:
+#         raise HTTPException(status_code=500, detail="Unexpected error occurred") from error
+#
+#     else:
+#         return existing_user
+
 @router.get("/{user_id}", response_model=UserResponse, status_code=200)
-async def get_user(user_id: int, db: Session = Depends(get_db)):
+async def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="You can only view your own account")
+
         existing_user = db.query(User).filter(User.id == user_id).first()
 
         if existing_user is None:
@@ -229,11 +256,50 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
 
 
 
-# Update A Single User API ---------------------------------------------------------------------------------------------
+# Update A Single User API (Protected Route) ---------------------------------------------------------------------------
+
+# @router.put("/update/{user_id}", response_model=UserResponse, status_code=200)
+# async def update_user(user_id: int, updated_user: UserCreate, db: Session = Depends(get_db)):
+#     try:
+#         existing_user = db.query(User).filter(User.id == user_id).first()
+#
+#         if existing_user is None:
+#             raise HTTPException(status_code=404, detail="User not found")
+#
+#         existing_user.email = updated_user.email
+#         existing_user.username = updated_user.username
+#         existing_user.full_name = updated_user.full_name
+#         existing_user.hashed_password = password_hasher.hash(updated_user.password)
+#
+#         db.commit()
+#         db.refresh(existing_user)
+#
+#     except HTTPException:
+#         raise
+#
+#     except SQLAlchemyError as error:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail="Database error occurred while updating user") from error
+#
+#     except Exception as error:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail="Unexpected error occurred") from error
+#
+#     else:
+#         return existing_user
+
 
 @router.put("/update/{user_id}", response_model=UserResponse, status_code=200)
-async def update_user(user_id: int, updated_user: UserCreate, db: Session = Depends(get_db)):
+async def update_user(
+    user_id: int,
+    updated_user: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="You can only update your own account")
+
         existing_user = db.query(User).filter(User.id == user_id).first()
 
         if existing_user is None:
@@ -265,11 +331,44 @@ async def update_user(user_id: int, updated_user: UserCreate, db: Session = Depe
 
 
 
-# Delete A Single User API ---------------------------------------------------------------------------------------------
+# Delete A Single User API (Protected Route)----------------------------------------------------------------------------
+
+# @router.delete("/delete/{user_id}", status_code=200)
+# async def delete_user(user_id: int, db: Session = Depends(get_db)):
+#     try:
+#         existing_user = db.query(User).filter(User.id == user_id).first()
+#
+#         if existing_user is None:
+#             raise HTTPException(status_code=404, detail="User not found")
+#
+#         db.delete(existing_user)
+#         db.commit()
+#
+#     except HTTPException:
+#         raise
+#
+#     except SQLAlchemyError as error:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail="Database error occurred while deleting user") from error
+#
+#     except Exception as error:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail="Unexpected error occurred") from error
+#
+#     else:
+#         return {"message": "User deleted successfully!"}
+
 
 @router.delete("/delete/{user_id}", status_code=200)
-async def delete_user(user_id: int, db: Session = Depends(get_db)):
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     try:
+        if current_user.id != user_id:
+            raise HTTPException(status_code=403, detail="You can only delete your own account")
+
         existing_user = db.query(User).filter(User.id == user_id).first()
 
         if existing_user is None:
@@ -397,7 +496,41 @@ async def login_user(credentials: UserLogin, db: Session = Depends(get_db)):
 
 
 
-# Get A Single User (through JWT verification) API ---------------------------------------------------------------------
+# Sign-Out A Single User API --------------------------------------------------------------------------------------------
+
+@router.post("/signout", status_code=200)
+async def signout_user(request: SignoutRequest, db: Session = Depends(get_db)):
+    try:
+        payload = decode_token(request.refresh_token)
+
+        if payload is None or payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+        stored_token = db.query(RefreshToken).filter(RefreshToken.jti == payload.get("jti")).first()
+
+        if stored_token is not None:
+            stored_token.revoked = True
+            db.commit()
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as error:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error occurred during signout") from error
+
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Unexpected error occurred") from error
+
+    else:
+        return {"message": "Signed out successfully"}
+
+
+
+
+
+# Get A Single User (through JWT verification) API (Protected Route) ---------------------------------------------------
 
 @router.get("/verified/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
